@@ -17,10 +17,20 @@ if (!process.env.MONGODB_URI) {
 
 // Connect to MongoDB
 async function connectToDB() {
-    const client = await MongoClient.connect(process.env.MONGODB_URI);
-    const db = client.db('Rental');
-    db.client = client;
-    return db;
+    const client = new MongoClient(process.env.MONGODB_URI, {
+        useNewUrlParser: true,
+        useUnifiedTopology: true
+    });
+
+    try {
+        await client.connect();
+        const db = client.db('Rental');
+        db.client = client;
+        return db;
+    } catch (err) {
+        console.error('Failed to connect to MongoDB', err);
+        throw err;
+    }
 }
 
 module.exports = { connectToDB, ObjectId };

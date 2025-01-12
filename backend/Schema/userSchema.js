@@ -3,12 +3,10 @@ const mongoose = require('mongoose');
 class UserSchema extends mongoose.Schema {
     constructor() {
         super({
-            User_id: String,
+            UserName: String,
             Email: String,
             Password: String,
-            UserName: String,
             ContactNum: String,
-            Department: String,
             isadmin: String,
         });
     }
