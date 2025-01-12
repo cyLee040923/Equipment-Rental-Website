@@ -7,7 +7,6 @@ const Equipment = require('./Schema/equipmentSchema');
 const User = require('./Schema/userSchema');
 const HighlightedEquipment = require('./Schema/equipmentSchema');
 const { connectToDB, ObjectId } = require('./utils/db');
-const { authenticate, verifyToken, generateToken} = require('./utils/auth');
 const cors = require('cors');
 
 // //For HTTPS server
@@ -282,6 +281,22 @@ class Server {
         });
 
 
+        // Fetch rental records
+        this.app.get('/api/rental-records', async (req, res) => {
+            console.log('Fetching rental records');
+            const db = await connectToDB();
+            try {
+                const rentalRecords = await db.collection("rental-records").find().toArray();
+                res.json({ rentalRecords });
+                console.log(rentalRecords)
+            } catch (err) {
+                res.status(400).json({ message: err.message });
+            } finally {
+                await db.client.close();
+            }
+        });
+
+
 
         // User Management Routes
 
@@ -366,36 +381,9 @@ class Server {
         });
 
         
-        // Get one single user by the user id
-        this.app.get('/api/equipments/:User_id', authenticate, verifyToken, async (req, res) => {
-            const db = await connectToDB();
-            try {
-                let result = await db.collection("users").findOne({
-                    _id: new ObjectId(req.params.id)
-                });
-                if (result) {
-                    res.json({
-                        success: true,
-                        data: result
-                    });
-                } else {
-                    res.status(404).json({
-                        success: false,
-                        message: "User not found"
-                    });
-                }
-            } catch (err) {
-                res.status(400).json({
-                    success: false,
-                    message: err.message
-                });
-            } finally {
-                await db.client.close();
-            }
-        });
 
         // Update user
-        this.app.put('/api/users/:User_id', authenticate, verifyToken, async (req, res) => {
+        this.app.put('/api/users/:User_id', async (req, res) => {
             const db = await connectToDB();
             try {
                 req.body.modified_at = new Date();
@@ -426,7 +414,7 @@ class Server {
         });
 
         // Delete user
-        this.app.delete('/api/users/:User_id', authenticate, verifyToken, async (req, res) => {
+        this.app.delete('/api/users/:User_id', async (req, res) => {
             const db = await connectToDB();
             try {
                 let result = await db.collection("users").deleteOne({
@@ -459,122 +447,7 @@ class Server {
     
     
     // Function to handle user login and admin page (Section Start)
-    async handleLogin(req, res) {
-        const { username, password } = req.body;
-        try {
-            const user = await User.findOne({ username });
-            if (!user) {
-                return res.status(401).json({ message: 'Invalid credentials' });
-            }
-            
-            const isMatch = await bcrypt.compare(password, user.password);
-            if (!isMatch) {
-                return res.status(401).json({ message: 'Invalid credentials' });
-            }
-
-            if (!user.isEmailVerified) {
-                return res.status(403).json({ 
-                    message: 'Email verification required',
-                    requiresVerification: true,
-                    username: user.username
-                });
-            }
-
-            const token = jwt.sign(
-                { userId: user._id, username, isadmin: user.isadmin },
-                'your_jwt_secret',
-                { expiresIn: '1h' }
-            );
-            res.json({ token, isadmin: user.isadmin, username });
-        } catch (error) {
-            res.status(500).json({ message: 'Server error' });
-        }
-    }
-
-    async handleRegister(req, res) {
-        const { username, password, email } = req.body;
-        try {
-            const existingUser = await User.findOne({ username });
-            if (existingUser) {
-                return res.status(400).json({ message: 'Username already exists' });
-            }
-
-            const hashedPassword = await bcrypt.hash(password, 10);
-            const user = new User({
-                username,
-                password: hashedPassword,
-                email,
-                isadmin: 0,
-                isEmailVerified: false
-            });
-
-            await user.save();
-            await authService.handleResendOTP(username);
-            res.status(201).json({ 
-                message: 'Registration successful. Please verify your email.',
-                username 
-            });
-        } catch (error) {
-            res.status(500).json({ message: 'Server error' });
-        }
-    }
-
-    async getUsers(req, res) {
-        try {
-            const users = await User.find({}, { password: 0 });
-            res.json(users);
-        } catch (error) {
-            res.status(500).json({ message: 'Server error' });
-        }
-    }
-
-    async createUser(req, res) {
-        const { username, password, isadmin } = req.body;
-        try {
-            const existingUser = await User.findOne({ username });
-            if (existingUser) {
-                return res.status(400).json({ message: 'Username already exists' }); // avoid duplicate user
-            }
-
-            const hashedPassword = await bcrypt.hash(password, 10);
-            const user = new User({
-                username,
-                password: hashedPassword,
-                isadmin: isadmin ? 1 : 0,
-                isEmailVerified: isadmin ? true : false
-            });
-
-            await user.save();
-            res.status(201).json({ message: 'User created successfully' });
-        } catch (error) {
-            res.status(500).json({ message: 'Server error' });
-        }
-    }
-
-    async deleteUser(req, res) {
-        try {
-            await User.deleteOne({ username: req.params.username });
-            res.json({ message: 'User deleted successfully' });
-        } catch (error) {
-            res.status(500).json({ message: 'Server error' });
-        }
-    }
-
-    async getUserInfo(req, res) {
-        try {
-            const user = await User.findOne(
-                { username: req.params.username },
-                { otp: 0 }
-            );
-            if (!user) {
-                return res.status(404).json({ message: 'User not found' });
-            }
-            res.json(user);
-        } catch (error) {
-            res.status(500).json({ message: 'Server error' });
-        }
-    }
-
+   
     async updateUserPassword(req, res) {
         try {
             const { newPassword } = req.body;
@@ -593,6 +466,9 @@ class Server {
         }
     }
     // Function to handle login page and admin page (Section End)
+
+
+    
 
 }
 
